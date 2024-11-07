@@ -123,15 +123,42 @@ class SecretManager:
 
     def load(self)->None:
         # function to load crypto data
-        raise NotImplemented()
+        
+        # Définir les chemins pour les fichiers de cryptographie
+        chemin_salt = os.path.join(self._path, "salt.bin")
+        chemin_token = os.path.join(self._path, "token.bin")
+        chemin_timestamp = os.path.join(self._path, "timestamp.bin")
+
+        # Vérifier la présence des fichiers requis pour charger les données cryptographiques
+        if os.path.isfile(chemin_salt) and os.path.isfile(chemin_token) and os.path.isfile(chemin_timestamp):
+            # Lire le contenu des fichiers pour le sel, le jeton et le timestamp
+            with open(chemin_salt, "rb") as fichier_salt:
+                self._salt = fichier_salt.read()
+            with open(chemin_token, "rb") as fichier_token:
+                self._token = fichier_token.read()
+            with open(chemin_timestamp, "rb") as fichier_timestamp:
+                self.timestamp = fichier_timestamp.read()
+        else:
+            # Logger un avertissement si un fichier est manquant
+            self._log.warning("Les fichiers de cryptographie (salt.bin, token.bin ou timestamp.bin) sont introuvables. Chargement impossible.")
+
+    
 
     def check_key(self, candidate_key:bytes)->bool:
         # Assert the key is valid
-        raise NotImplemented()
+        derived_token = self.do_derivation(self._salt, candidate_key)
+        return derived_token == self._token
+        
 
     def set_key(self, b64_key:str)->None:
         # If the key is valid, set the self._key var for decrypting
-        raise NotImplemented()
+        decoded_key = base64.b64decode(b64_key)
+    
+        if self.check_key(decoded_key):
+            self._key = decoded_key  # Assigner la clé si valide
+        else:
+            raise ValueError("Clé fournie invalide.")
+            
 
     def get_hex_token(self)->str:
         # Should return a string composed of hex symbole, regarding the token
@@ -160,4 +187,31 @@ class SecretManager:
 
     def clean(self):
         # remove crypto data from the target
-        raise NotImplemented()
+        # Définit les chemins vers les fichiers cryptographiques
+        salt_path = os.path.join(self._path, "_salt.bin")
+        token_path = os.path.join(self._path, "_token.bin")
+        timestamp_path = os.path.join(self._path, "_timestamp.bin")
+
+        # Liste des fichiers à supprimer
+        files_to_delete = {
+            "salt": salt_path,
+            "token": token_path,
+            "timestamp": timestamp_path
+        }
+
+        # Suppression des fichiers et journalisation
+        for name, file_path in files_to_delete.items():
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    self._log.info(f"Fichier '{name}' supprimé avec succès.")
+                except Exception as e:
+                    self._log.error(f"Erreur lors de la suppression du fichier '{name}': {e}")
+            else:
+                self._log.warning(f"Le fichier '{name}' est introuvable.")
+
+        # Efface les données sensibles en mémoire
+        self._salt = None
+        self._token = None
+        self._key = None
+        
